@@ -38,7 +38,40 @@ module Dependabot
         dependency_set.dependencies
       end
 
+      sig { returns(Ecosystem) }
+      def ecosystem
+        @ecosystem ||= T.let(
+          Ecosystem.new(
+            name: ECOSYSTEM,
+            package_manager: package_manager
+          ),
+          T.nilable(Ecosystem)
+        )
+      end
+
       private
+
+      sig { returns(Ecosystem::VersionManager) }
+      def package_manager
+        @package_manager ||= T.let(begin
+          uses_versions = workflow_files.flat_map do |file|
+            json = YAML.safe_load(T.must(file.content), aliases: true, permitted_classes: [Date, Time, Symbol])
+            next [] if json.nil?
+
+            uses_strings = deep_fetch_uses(json.fetch("jobs", json.fetch("runs", nil))).uniq
+            uses_strings.filter_map do |string|
+              match = string.match(GITHUB_REPO_REFERENCE)
+              match[:ref] if match
+            end
+          end
+
+          # Default to "0.0.0" if no versions are found
+          default_version = uses_versions.first || "0.0.0"
+
+          # Initialize the PackageManager with the extracted version
+          PackageManager.new(default_version)
+        end, T.nilable(Dependabot::GithubActions::PackageManager))
+      end
 
       sig { params(file: Dependabot::DependencyFile).returns(Dependabot::FileParsers::Base::DependencySet) }
       def workfile_file_dependencies(file)
