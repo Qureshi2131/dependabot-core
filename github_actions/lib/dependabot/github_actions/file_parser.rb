@@ -54,21 +54,27 @@ module Dependabot
       sig { returns(Ecosystem::VersionManager) }
       def package_manager
         @package_manager ||= T.let(begin
+          # Extracts the `ref` (version) part from `uses` declarations in workflow files.
+          # For example, in `actions/checkout@v2.3.4`, the `ref` extracted is "v2.3.4".
+          # These versions are collected from all `uses` keys across the workflow files.
           uses_versions = workflow_files.flat_map do |file|
             json = YAML.safe_load(T.must(file.content), aliases: true, permitted_classes: [Date, Time, Symbol])
             next [] if json.nil?
 
+            # Recursively fetch all `uses` strings from the JSON structure of the workflow file.
             uses_strings = deep_fetch_uses(json.fetch("jobs", json.fetch("runs", nil))).uniq
+
+            # Extract the `ref` part of the `uses` declaration, if it matches the GitHub repository reference format.
             uses_strings.filter_map do |string|
               match = string.match(GITHUB_REPO_REFERENCE)
               match[:ref] if match
             end
           end
 
-          # Default to "0.0.0" if no versions are found
+          # Default to "0.0.0" if no versions are found in any `uses` declarations.
           default_version = uses_versions.first || "0.0.0"
 
-          # Initialize the PackageManager with the extracted version
+          # Initialize the PackageManager with the extracted version.
           PackageManager.new(default_version)
         end, T.nilable(Dependabot::GithubActions::PackageManager))
       end
