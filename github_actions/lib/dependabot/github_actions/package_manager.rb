@@ -2,9 +2,9 @@
 # frozen_string_literal: true
 
 require "sorbet-runtime"
-require "dependabot/bundler/version"
+require "dependabot/github_actions/version"
 require "dependabot/ecosystem"
-require "dependabot/bundler/requirement"
+require "dependabot/github_actions/requirement"
 
 module Dependabot
   module GithubActions
